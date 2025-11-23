@@ -1,0 +1,5 @@
+{
+  "name": "Mario Map Editor",
+  "description": "A tile-based level editor for a Mario-style platformer game. Features grid-based placement, property configuration, and JSON export.",
+  "requestFramePermissions": []
+}
