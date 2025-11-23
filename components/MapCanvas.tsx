@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { MapData, EditorTool } from '../types';
+import { MapData, EditorTool, GridCell } from '../types';
 import { TOOLS, TILE_SIZE_DEFAULT } from '../constants';
 
 interface MapCanvasProps {
@@ -37,11 +38,12 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
     setDrawMode(mode);
 
     if (mode === 'erase') {
+      // Erase passes null
       onUpdateCell(row, col, null);
     } else {
       // If tool is eraser, it's also erasing
       if (selectedTool.id === 'eraser') {
-        onUpdateCell(row, col, null);
+        onUpdateCell(row, col, 'eraser');
       } else {
         onUpdateCell(row, col, selectedTool.id);
       }
@@ -52,7 +54,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
     if (!isDrawing) return;
 
     if (drawMode === 'erase' || selectedTool.id === 'eraser') {
-      onUpdateCell(row, col, null);
+      onUpdateCell(row, col, 'eraser');
     } else {
       onUpdateCell(row, col, selectedTool.id);
     }
@@ -62,16 +64,41 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
     setIsDrawing(false);
   };
 
-  // Helper to render cell content
-  const renderCellContent = (toolId: string | null) => {
-    if (!toolId) return null;
-    const tool = TOOLS.find(t => t.id === toolId);
-    if (!tool) return null;
+  // Helper to render cell content with layers
+  const renderCellContent = (cell: GridCell) => {
+    // Layer 1: Terrain
+    let terrainNode = null;
+    if (cell.terrainId && cell.terrainId !== '0') {
+      const tool = TOOLS.find(t => t.id === cell.terrainId);
+      if (tool) {
+        terrainNode = (
+          <div className={`absolute inset-0 flex items-center justify-center text-lg shadow-sm ${tool.color}`}>
+            {tool.icon}
+          </div>
+        );
+      }
+    }
+
+    // Layer 2: Entity
+    let entityNode = null;
+    if (cell.entityId) {
+      const tool = TOOLS.find(t => t.id === cell.entityId);
+      if (tool) {
+        entityNode = (
+           <div className={`absolute inset-0 flex items-center justify-center z-10`}>
+             <div className={`w-3/4 h-3/4 flex items-center justify-center rounded-full shadow-md ${tool.color} border border-white/40 hover:scale-110 transition-transform`}>
+                <span className="text-sm drop-shadow-md">{tool.icon}</span>
+             </div>
+           </div>
+        );
+      }
+    }
 
     return (
-      <div className={`w-full h-full flex items-center justify-center text-lg shadow-sm ${tool.color} animate-fade-in`}>
-        {tool.icon}
-      </div>
+      <>
+        {terrainNode}
+        {entityNode}
+      </>
     );
   };
 
@@ -110,14 +137,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
             }}
           >
             {mapData.grid.map((row, rowIndex) => (
-              row.map((cellValue, colIndex) => (
+              row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  className="w-full h-full hover:bg-blue-500/20 transition-colors duration-75 border-transparent border hover:border-blue-400 box-border"
+                  className="w-full h-full relative hover:bg-blue-500/10 transition-colors duration-75 border-transparent border hover:border-blue-300 box-border"
                   onMouseDown={(e) => handleMouseDown(rowIndex, colIndex, e)}
                   onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
                 >
-                  {renderCellContent(cellValue)}
+                  {renderCellContent(cell)}
                 </div>
               ))
             ))}
@@ -127,7 +154,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
           <div className="absolute -top-6 left-0 flex text-xs text-gray-500 font-mono">
              <span>0</span>
              <span style={{ marginLeft: (TILE_SIZE_DEFAULT * 10) - 8 }}>10</span>
-             <span style={{ marginLeft: (TILE_SIZE_DEFAULT * 10) - 16 }}>20</span>
+             <span style={{ marginLeft: (TILE_SIZE_DEFAULT * 20) - 16 }}>20</span>
           </div>
           
         </div>
@@ -136,7 +163,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
       {/* Info bar at bottom */}
       <div className="bg-white border-t border-gray-200 p-2 px-4 text-xs text-gray-500 flex justify-between">
          <span>Canvas Size: {mapData.gridWidthCount * TILE_SIZE_DEFAULT}px x {mapData.height * TILE_SIZE_DEFAULT}px</span>
-         <span>Hold Right-Click to Erase</span>
+         <span>Left-Click: Place • Right-Click: Erase All</span>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+
 // This file defines the attributes for game characters and elements.
 // It is separated from the logic as requested.
 
@@ -43,6 +44,13 @@ export const ELEMENT_CONFIG = {
       isSolid: true,
       destructible: false,
     },
+    deathBlock: {
+      id: "4",
+      name: "Invisible Death",
+      isSolid: false, // or true depending on mechanic, usually pit-like behavior
+      deadly: true,
+      destructible: false,
+    }
   },
   // Entity definitions
   entities: {

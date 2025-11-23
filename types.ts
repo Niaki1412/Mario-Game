@@ -1,3 +1,4 @@
+
 // Defines the fundamental types for the Map and Editor
 
 export enum ItemCategory {
@@ -24,16 +25,20 @@ export interface MapObject {
   variant?: string;
 }
 
+// Represents a single cell in the grid, capable of holding both terrain and an entity
+export interface GridCell {
+  terrainId: string | null;
+  entityId: string | null;
+}
+
 export interface MapData {
   width: number;       // Width in pixels
   height: number;      // Height in grids (rows)
   gridWidthCount: number; // Width in grids (cols)
   tileSize: number;
   // Visual representation for the editor (combines layers)
-  // We use a flat representation for the editor state to make rendering easier,
-  // then convert to the specific JSON format on export.
-  // 0 = empty. String = tool ID.
-  grid: (string | null)[][]; 
+  // grid[row][col]
+  grid: GridCell[][]; 
 }
 
 export interface ExportedMapJson {

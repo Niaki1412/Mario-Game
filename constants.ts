@@ -1,11 +1,12 @@
+
 import { EditorTool, ItemCategory } from "./types";
 import { ELEMENT_CONFIG } from "./gameConfig";
 
 // This file maps the internal game configuration to the Editor UI Tools
 
 export const TILE_SIZE_DEFAULT = 32;
-export const GRID_HEIGHT_DEFAULT = 15; // 15 blocks high
-export const GRID_WIDTH_DEFAULT = 100; // 100 blocks wide default
+export const GRID_HEIGHT_DEFAULT = 32; // Updated per request
+export const GRID_WIDTH_DEFAULT = 640; // Updated per request
 
 export const TOOLS: EditorTool[] = [
   {
@@ -44,6 +45,15 @@ export const TOOLS: EditorTool[] = [
     icon: "🔲",
     description: "Indestructible block",
     jsonValue: ELEMENT_CONFIG.tiles.hardBlock.id
+  },
+  {
+    id: "death_block",
+    name: ELEMENT_CONFIG.tiles.deathBlock.name,
+    category: ItemCategory.TERRAIN,
+    color: "bg-red-900/80 border-2 border-red-500",
+    icon: "💀",
+    description: "Invisible/Death",
+    jsonValue: ELEMENT_CONFIG.tiles.deathBlock.id
   },
   // Entity Tools
   {
