@@ -11,12 +11,10 @@ interface MapCanvasProps {
 
 const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCell }) => {
   const [isDrawing, setIsDrawing] = useState(false);
-  // Track if we are erasing (right click) or painting (left click)
   const [drawMode, setDrawMode] = useState<'paint' | 'erase'>('paint');
   
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  // Prevent context menu on right click to allow "Right Click Eraser"
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
     const currentRef = canvasContainerRef.current;
@@ -32,16 +30,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
 
   const handleMouseDown = (row: number, col: number, e: React.MouseEvent) => {
     setIsDrawing(true);
-    
-    // Left click = paint, Right click = erase
     const mode = e.button === 2 ? 'erase' : 'paint';
     setDrawMode(mode);
 
     if (mode === 'erase') {
-      // Erase passes null
       onUpdateCell(row, col, null);
     } else {
-      // If tool is eraser, it's also erasing
+      // If the selected tool is explicitly the eraser tool
       if (selectedTool.id === 'eraser') {
         onUpdateCell(row, col, 'eraser');
       } else {
@@ -52,7 +47,6 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
 
   const handleMouseEnter = (row: number, col: number) => {
     if (!isDrawing) return;
-
     if (drawMode === 'erase' || selectedTool.id === 'eraser') {
       onUpdateCell(row, col, 'eraser');
     } else {
@@ -64,22 +58,21 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
     setIsDrawing(false);
   };
 
-  // Helper to render cell content with layers
   const renderCellContent = (cell: GridCell) => {
-    // Layer 1: Terrain
     let terrainNode = null;
     if (cell.terrainId && cell.terrainId !== '0') {
       const tool = TOOLS.find(t => t.id === cell.terrainId);
       if (tool) {
+        // Special visual for death block to make it visible in editor but semi-transparent
+        const opacity = tool.id === 'death_block' ? 'opacity-70' : 'opacity-100';
         terrainNode = (
-          <div className={`absolute inset-0 flex items-center justify-center text-lg shadow-sm ${tool.color}`}>
+          <div className={`absolute inset-0 flex items-center justify-center text-lg shadow-sm ${tool.color} ${opacity} transition-opacity hover:opacity-90`}>
             {tool.icon}
           </div>
         );
       }
     }
 
-    // Layer 2: Entity
     let entityNode = null;
     if (cell.entityId) {
       const tool = TOOLS.find(t => t.id === cell.entityId);
@@ -87,7 +80,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
         entityNode = (
            <div className={`absolute inset-0 flex items-center justify-center z-10`}>
              <div className={`w-3/4 h-3/4 flex items-center justify-center rounded-full shadow-md ${tool.color} border border-white/40 hover:scale-110 transition-transform`}>
-                <span className="text-sm drop-shadow-md">{tool.icon}</span>
+                <span className="text-xs drop-shadow-md">{tool.icon}</span>
              </div>
            </div>
         );
@@ -102,7 +95,6 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
     );
   };
 
-  // Generate grid style for background
   const gridStyle = {
     backgroundSize: `${TILE_SIZE_DEFAULT}px ${TILE_SIZE_DEFAULT}px`,
     backgroundImage: `
@@ -112,23 +104,24 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
   };
 
   return (
+    // Main container handles scrolling. 
+    // overflow-x-auto allows Left/Right movement.
+    // overflow-y-auto allows Up/Down if screen is too small, but we try to keep it fixed if possible.
     <div 
-      className="flex-1 bg-gray-200 overflow-x-auto overflow-y-hidden relative custom-scrollbar flex flex-col"
+      className="flex-1 bg-gray-100 overflow-x-auto overflow-y-auto relative custom-scrollbar flex flex-col"
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <div className="flex-1 flex items-center justify-start p-8 min-w-max">
-        {/* White Canvas Background */}
+      <div className="flex-1 flex items-start justify-start p-12 min-w-max">
         <div 
           ref={canvasContainerRef}
-          className="bg-white shadow-2xl relative select-none"
+          className="bg-white shadow-2xl relative select-none border border-gray-300"
           style={{
             width: mapData.gridWidthCount * TILE_SIZE_DEFAULT,
             height: mapData.height * TILE_SIZE_DEFAULT,
             ...gridStyle
           }}
         >
-          {/* We use a CSS grid for rendering cells to ensure pixel perfection */}
           <div 
             style={{
               display: 'grid',
@@ -140,7 +133,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
               row.map((cell, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  className="w-full h-full relative hover:bg-blue-500/10 transition-colors duration-75 border-transparent border hover:border-blue-300 box-border"
+                  className="w-full h-full relative hover:bg-blue-500/10 transition-colors duration-75"
                   onMouseDown={(e) => handleMouseDown(rowIndex, colIndex, e)}
                   onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
                 >
@@ -150,20 +143,27 @@ const MapCanvas: React.FC<MapCanvasProps> = ({ mapData, selectedTool, onUpdateCe
             ))}
           </div>
 
-          {/* Grid Markers / Rulers */}
-          <div className="absolute -top-6 left-0 flex text-xs text-gray-500 font-mono">
-             <span>0</span>
-             <span style={{ marginLeft: (TILE_SIZE_DEFAULT * 10) - 8 }}>10</span>
-             <span style={{ marginLeft: (TILE_SIZE_DEFAULT * 20) - 16 }}>20</span>
+          {/* Top Ruler */}
+          <div className="absolute -top-6 left-0 right-0 h-6 flex items-end border-b border-gray-300 pointer-events-none">
+             {Array.from({ length: Math.ceil(mapData.gridWidthCount / 5) }).map((_, i) => (
+               <div key={i} className="absolute text-[10px] text-gray-400 font-mono" style={{ left: i * 5 * TILE_SIZE_DEFAULT }}>
+                 | {i * 5}
+               </div>
+             ))}
+          </div>
+
+          {/* Left Ruler */}
+          <div className="absolute top-0 -left-8 bottom-0 w-8 flex flex-col items-end pr-1 pointer-events-none">
+             {Array.from({ length: mapData.height }).map((_, i) => (
+                (i % 5 === 0) ? (
+                  <div key={i} className="absolute text-[10px] text-gray-400 font-mono" style={{ top: i * TILE_SIZE_DEFAULT }}>
+                    {i} -
+                  </div>
+                ) : null
+             ))}
           </div>
           
         </div>
-      </div>
-
-      {/* Info bar at bottom */}
-      <div className="bg-white border-t border-gray-200 p-2 px-4 text-xs text-gray-500 flex justify-between">
-         <span>Canvas Size: {mapData.gridWidthCount * TILE_SIZE_DEFAULT}px x {mapData.height * TILE_SIZE_DEFAULT}px</span>
-         <span>Left-Click: Place • Right-Click: Erase All</span>
       </div>
     </div>
   );

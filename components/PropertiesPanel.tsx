@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface PropertiesPanelProps {
   gridWidth: number;
@@ -19,9 +19,23 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onReset
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Local state for inputs to prevent lag on every keystroke
+  const [localWidth, setLocalWidth] = useState(gridWidth);
+  const [localHeight, setLocalHeight] = useState(gridHeight);
+
+  // Sync local state if props change externally (e.g. after Import)
+  useEffect(() => {
+    setLocalWidth(gridWidth);
+    setLocalHeight(gridHeight);
+  }, [gridWidth, gridHeight]);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleApplySize = () => {
+    onUpdateSize(localWidth, localHeight);
   };
 
   return (
@@ -34,42 +48,49 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       <div className="p-6 space-y-6 flex-1 overflow-y-auto">
         
         {/* Dimensions Section */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Map Dimensions</h3>
+        <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Map Grid Size</h3>
           
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
-              Width (blocks)
+              Length (Grid Cells)
             </label>
             <input 
               type="number" 
               min="20" 
               max="2000"
-              value={gridWidth}
-              onChange={(e) => onUpdateSize(parseInt(e.target.value) || 20, gridHeight)}
+              value={localWidth}
+              onChange={(e) => setLocalWidth(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
-            <p className="text-xs text-gray-500">Length of the level (Default: 640)</p>
+            <p className="text-xs text-gray-500">Default: 640</p>
           </div>
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
-              Height (blocks)
+              Height (Grid Cells)
             </label>
             <input 
               type="number" 
               min="10" 
               max="100"
-              value={gridHeight}
-              onChange={(e) => onUpdateSize(gridWidth, parseInt(e.target.value) || 10)}
+              value={localHeight}
+              onChange={(e) => setLocalHeight(parseInt(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
-            <p className="text-xs text-gray-500">Vertical height (Default: 32)</p>
+            <p className="text-xs text-gray-500">Default: 32</p>
           </div>
+
+          <button
+            onClick={handleApplySize}
+            className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-md shadow-sm transition-colors"
+          >
+            Apply Size Changes
+          </button>
         </div>
 
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">File Actions</h3>
+        <div className="pt-2 border-t border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-4">File Management</h3>
           
           <button 
             onClick={onExport}
@@ -78,7 +99,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-            Export JSON
+            Export Map JSON
           </button>
 
            <button 
@@ -88,7 +109,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
             </svg>
-            Import JSON
+            Import Map JSON
           </button>
           <input 
             type="file" 
@@ -100,18 +121,19 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
           <button 
             onClick={onReset}
-            className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            className="w-full flex justify-center items-center px-4 py-3 border border-red-200 text-sm font-medium rounded-md shadow-sm text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
           >
-            Clear Map
+            Reset / Clear Map
           </button>
         </div>
 
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
-          <p className="font-semibold mb-1">Tips:</p>
+        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-100 text-xs text-yellow-800">
+          <p className="font-bold mb-1">Instructions:</p>
           <ul className="list-disc pl-4 space-y-1">
-            <li>Scene moves horizontally.</li>
-            <li>You can stack entities (Coins, Mushrooms) on top of tiles (Ground, Bricks).</li>
-            <li>Export saves to <code>/maps</code> structure format.</li>
+            <li>Edit Width/Height and click <b>Apply</b>.</li>
+            <li>Drag elements from left to canvas.</li>
+            <li><b>Entity Layer</b>: Mushrooms/Coins can be placed <i>on top</i> of Ground/Bricks.</li>
+            <li><b>Invisible Block</b>: Use the skull icon 💀.</li>
           </ul>
         </div>
       </div>

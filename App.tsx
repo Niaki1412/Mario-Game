@@ -7,12 +7,9 @@ import { EditorTool, MapData, ItemCategory, ExportedMapJson, MapObject, GridCell
 import { TOOLS, GRID_HEIGHT_DEFAULT, GRID_WIDTH_DEFAULT, TILE_SIZE_DEFAULT } from './constants';
 
 const App: React.FC = () => {
-  // --- State ---
   const [selectedTool, setSelectedTool] = useState<EditorTool>(TOOLS[1]); // Default to Ground
 
-  // Map Data State with support for layers
   const [mapData, setMapData] = useState<MapData>(() => {
-    // Initialize grid with objects
     const grid = Array(GRID_HEIGHT_DEFAULT).fill(null).map(() => 
       Array(GRID_WIDTH_DEFAULT).fill(null).map(() => ({ terrainId: null, entityId: null }))
     );
@@ -25,19 +22,17 @@ const App: React.FC = () => {
     };
   });
 
-  // --- Handlers ---
-
   const handleSelectTool = (tool: EditorTool) => {
     setSelectedTool(tool);
   };
 
   const handleUpdateCell = useCallback((row: number, col: number, toolId: string | null) => {
     setMapData(prev => {
-      const newGrid = prev.grid.map(r => r.map(c => ({...c}))); // Deep copy grid for safety with objects
+      const newGrid = prev.grid.map(r => r.map(c => ({...c})));
       const cell = newGrid[row][col];
 
       if (toolId === 'eraser' || toolId === null) {
-        // Eraser clears EVERYTHING in that cell
+        // If manually erasing, clear everything
         cell.terrainId = null;
         cell.entityId = null;
       } else {
@@ -56,10 +51,12 @@ const App: React.FC = () => {
   }, []);
 
   const handleUpdateSize = (newCols: number, newRows: number) => {
+    if (newCols < 1 || newRows < 1) return;
+    
     setMapData(prev => {
-      // Create new grid with new dimensions, preserving existing data where possible
       const newGrid = Array(newRows).fill(null).map((_, rIndex) => 
         Array(newCols).fill(null).map((_, cIndex) => {
+          // Preserve existing data if within bounds
           if (rIndex < prev.grid.length && cIndex < prev.grid[0].length) {
             return { ...prev.grid[rIndex][cIndex] };
           }
@@ -78,7 +75,7 @@ const App: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (confirm("Are you sure you want to clear the map?")) {
+    if (window.confirm("Are you sure you want to clear the map? All progress will be lost.")) {
        const grid = Array(mapData.height).fill(null).map(() => 
          Array(mapData.gridWidthCount).fill(null).map(() => ({ terrainId: null, entityId: null }))
        );
@@ -95,7 +92,7 @@ const App: React.FC = () => {
       for (let c = 0; c < mapData.gridWidthCount; c++) {
         const cell = mapData.grid[r][c];
         
-        // 1. Process Terrain
+        // Terrain Layer
         if (cell.terrainId) {
           const tool = TOOLS.find(t => t.id === cell.terrainId);
           if (tool && tool.jsonValue) {
@@ -107,7 +104,7 @@ const App: React.FC = () => {
           rowStrings.push("0");
         }
 
-        // 2. Process Objects
+        // Entity Layer
         if (cell.entityId) {
           const tool = TOOLS.find(t => t.id === cell.entityId);
           if (tool && tool.objectType) {
@@ -115,7 +112,6 @@ const App: React.FC = () => {
                type: tool.objectType,
                x: c * mapData.tileSize,
                y: r * mapData.tileSize,
-               // Add specific properties if needed
              });
           }
         }
@@ -131,11 +127,10 @@ const App: React.FC = () => {
       objects: objects
     };
 
-    // Trigger download
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "level_map.json");
+    downloadAnchorNode.setAttribute("download", "mario_level.json");
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -151,14 +146,16 @@ const App: React.FC = () => {
         const json = JSON.parse(e.target?.result as string) as ExportedMapJson;
         
         // Basic Validation
-        if (!json.tiles || !json.width || !json.height) {
-          alert("Invalid JSON map format detected.");
+        if (!json.tiles || !Array.isArray(json.tiles)) {
+          alert("Invalid JSON: Missing 'tiles' array.");
           return;
         }
 
         const newRows = json.tiles.length;
-        const newCols = json.tiles[0].length;
+        const newCols = json.tiles[0]?.length || 0;
         
+        if (newRows === 0 || newCols === 0) return;
+
         // Reconstruct Grid
         const newGrid = Array(newRows).fill(null).map(() => 
             Array(newCols).fill(null).map(() => ({ terrainId: null, entityId: null } as GridCell))
@@ -178,9 +175,9 @@ const App: React.FC = () => {
         }
 
         // 2. Fill Objects
-        if (json.objects) {
+        if (json.objects && Array.isArray(json.objects)) {
            json.objects.forEach(obj => {
-             // Convert pixel to grid coordinate
+             // Convert pixel to grid coordinate safely
              const c = Math.floor(obj.x / json.tileSize);
              const r = Math.floor(obj.y / json.tileSize);
              
@@ -194,19 +191,19 @@ const App: React.FC = () => {
         }
 
         setMapData({
-          width: json.width,
-          height: json.height,
+          width: newCols * json.tileSize,
+          height: newRows,
           gridWidthCount: newCols,
           tileSize: json.tileSize,
           grid: newGrid
         });
         
-        // Reset file input
+        // Clear input
         event.target.value = "";
 
       } catch (err) {
         console.error(err);
-        alert("Failed to parse JSON file.");
+        alert("Failed to parse JSON file. Please check the format.");
       }
     };
     reader.readAsText(file);
@@ -215,21 +212,20 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen bg-gray-100 overflow-hidden font-sans text-gray-800">
       
-      {/* Left Sidebar: Tools */}
       <EditorSidebar 
         selectedToolId={selectedTool.id} 
         onSelectTool={handleSelectTool} 
       />
 
-      {/* Main Area: Canvas */}
       <div className="flex-1 flex flex-col relative h-full">
-        {/* Header / Top Bar */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center px-6 shadow-sm z-20 justify-between">
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center px-6 shadow-sm z-20 justify-between shrink-0">
           <div className="flex items-center">
              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-blue-600 mr-4">
-              Mario Map Editor
+              Map Editor
             </h1>
-            <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-500 border border-gray-300">v1.0</span>
+             <div className="text-xs text-gray-400">
+               {mapData.gridWidthCount} x {mapData.height}
+             </div>
           </div>
           
           <div className="flex items-center space-x-4 text-sm text-gray-500">
@@ -239,16 +235,15 @@ const App: React.FC = () => {
              </div>
              <div className="flex items-center">
                <span className="w-3 h-3 bg-amber-700 mr-2"></span>
-               Ground
+               Terrain
              </div>
              <div className="flex items-center">
-               <span className="w-3 h-3 bg-red-500 rounded-t mr-2"></span>
-               Entity (Layer 2)
+               <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+               Entity
              </div>
           </div>
         </header>
 
-        {/* The Grid Canvas */}
         <MapCanvas 
           mapData={mapData} 
           selectedTool={selectedTool} 
@@ -256,7 +251,6 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Right Sidebar: Properties */}
       <PropertiesPanel 
         gridWidth={mapData.gridWidthCount}
         gridHeight={mapData.height}
